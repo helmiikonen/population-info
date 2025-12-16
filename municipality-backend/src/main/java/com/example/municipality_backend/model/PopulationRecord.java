@@ -4,15 +4,14 @@ public class PopulationRecord {
     private int year;
 
     private int total;     // kokonaisväestö
-    private int age0_17;   // 0-17
-    private int age18_64;  // 18-64
-    private int age65plus; // 65-
+    private int age0_17;   // 0-17-vuotiaat
+    private int age18_64;  // 18-64-vuotiaat
+    private int age65plus; // yli 65-vuotiaat
 
     public PopulationRecord(int year) {
         this.year = year;
     }
 
-    // getterit ja setterit
     public int getYear() { return year; }
     public void setTotal(int total) { this.total = total; }
     public void setAge0_17(int value) { this.age0_17 = value; }

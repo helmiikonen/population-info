@@ -9,8 +9,6 @@ public class MunicipalityData {
     private String municipalityCode;  
     private String municipalityName;  
     
-
-    // Key: year → population record
     private Map<Integer, PopulationRecord> populationByYear = new TreeMap<>();
 
     public MunicipalityData(String code, String name) {

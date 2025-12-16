@@ -20,7 +20,7 @@ public class MunicipalityController {
 
     @GetMapping("/municipality/{code}")
     public MunicipalityData getMunicipality(@PathVariable String code) {
-        return municipalityService.getMunicipality(code);
+        return this.municipalityService.getMunicipality(code);
     }
     
     @GetMapping("/municipalities")

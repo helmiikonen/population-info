@@ -1,17 +1,27 @@
-function YearDropdown({ onSelect }) {
+import { 
+  InputLabel,
+  MenuItem,
+  FormControl,
+  Select
+ } from '@mui/material';
 
-  const years = []
-  for (let y=1987; y<=2023; y++){
-    years.push(y);
-  }
+function YearDropdown({ yearOptions, defaultValue, labelText, handleChange }) {
 
   return (
-    <select onChange={e => onSelect(e.target.value)}>
-      <option value="">Kaikki vuodet</option>
-      {years.map(year => (
-        <option key={year} value={year}>{year}</option>
-      ))}
-    </select>
+    <FormControl sx={{ maxHeight: 10, marginX: 1 }}>
+      <InputLabel id="label-id">{labelText}</InputLabel>
+      <Select
+        labelId="label-id"
+        id="select-year"
+        value={defaultValue}
+        label={labelText}
+        onChange={handleChange}
+      >
+        {yearOptions.map(year => (
+          <MenuItem value={year}>{year}</MenuItem>
+        ))}
+      </Select>
+    </FormControl>
   );
 }
 

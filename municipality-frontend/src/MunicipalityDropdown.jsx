@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
+import { 
+  InputLabel,
+  MenuItem,
+  FormControl,
+  Select
+ } from '@mui/material';
 
-function MunicipalityDropdown({ onSelect }) {
+function MunicipalityDropdown({ selectedMunicipality, setSelectedMunicipality }) {
   const [municipalities, setMunicipalities] = useState([]);
 
   useEffect(() => {
@@ -10,17 +16,29 @@ function MunicipalityDropdown({ onSelect }) {
     .catch(err => console.error(err));
   }, []);
 
-  
+  const handleChange = (event) => {
+    setSelectedMunicipality(event.target.value);
+  }
 
   return (
-    <select onChange={e => onSelect(e.target.value)}>
-      <option value="">Valitse kunta</option>
-      
-      {municipalities.map(m => (
-        <option key={m.code} value={m.code}>{m.name}</option>
-      ))}
-    </select>
+    <FormControl sx={{ maxHeight: 10, minWidth: 200, marginRight: 1 }}>
+      <InputLabel id="municipality-label">Valitse kunta</InputLabel>
+      <Select
+        labelId="municipality-label"
+        id="select-municipality"
+        value={selectedMunicipality}
+        label="Valitse kunta"
+        onChange={handleChange}
+      >
+        <MenuItem value="SSS">Koko maa</MenuItem>
+        {municipalities.map(m => (
+          <MenuItem value={m.code}>{m.name}</MenuItem>
+        ))}
+      </Select>
+    </FormControl>
   );
+    
+    
 }
 
 export default MunicipalityDropdown;

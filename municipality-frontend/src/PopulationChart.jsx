@@ -6,25 +6,30 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import FormControl from '@mui/material/FormControl';
 import FormLabel from '@mui/material/FormLabel';
 
-function PopulationChart({data}) {
+function PopulationChart({data, startYear, endYear}) {
 
   const populationByYear = []
 
-  const valueFormatter = (value) => `${(value*100).toFixed(1)}%`
+  const percentageFormatter = (value) => `${(value*100).toFixed(1)}%`
+
+  const thousandSeparatorFormatter = (value) => new Intl.NumberFormat().format(value);
 
   const [ageGroupView, setAgeGroupView] = useState("numbers");
 
   Object.entries(data.populationByYear).map(entry => {
-    populationByYear.push({
-      year: entry[1].year.toString(), 
-      total: entry[1].total,
-      age0_17: entry[1].age0_17,
-      age18_64: entry[1].age18_64,
-      age65plus: entry[1].age65plus,
-      age0_17_relative: entry[1].age0_17 / entry[1].total,
-      age18_64_relative: entry[1].age18_64 / entry[1].total,
-      age65plus_relative: entry[1].age65plus / entry[1].total,
-    })
+
+    if (entry[1].year >= startYear && entry[1].year <= endYear) {
+      populationByYear.push({
+        year: entry[1].year.toString(), 
+        total: entry[1].total,
+        age0_17: entry[1].age0_17,
+        age18_64: entry[1].age18_64,
+        age65plus: entry[1].age65plus,
+        age0_17_relative: entry[1].age0_17 / entry[1].total,
+        age18_64_relative: entry[1].age18_64 / entry[1].total,
+        age65plus_relative: entry[1].age65plus / entry[1].total,
+      })
+    }    
   })
 
   const handleChange = (event) => {
@@ -33,12 +38,16 @@ function PopulationChart({data}) {
 
   return (
     <div>
-      <h4>Kunnan kokonaisväestö</h4>
+      <h4>Kokonaisväestö</h4>
       <LineChart
         dataset = {populationByYear}
         grid={{ vertical: true, horizontal: true }}
-        xAxis={[{ dataKey: 'year', valueFormatter: (value) => value.toString() }]}
-        yAxis={[{ width: 100 }]}
+        xAxis={[{ 
+          dataKey: 'year', 
+          valueFormatter: (value) => value.toString(),
+          tickMinStep: 1
+        }]}
+        yAxis={[{ width: 100, valueFormatter: thousandSeparatorFormatter }]}
         series={[
           {
             dataKey: 'total',
@@ -46,7 +55,7 @@ function PopulationChart({data}) {
         ]}
         height={300}
       />
-      <h4>Kunnan väestö ikäryhmittäin</h4>
+      <h4>Väestö ikäryhmittäin</h4>
        <FormControl>
         <FormLabel id="select-agegroup-view">Näytä</FormLabel>
         <RadioGroup
@@ -65,7 +74,7 @@ function PopulationChart({data}) {
           dataset={populationByYear}
           grid={{ vertical: true, horizontal: true }}
           xAxis={[{ dataKey: 'year' }]}
-          yAxis={[{ width: 100 }]}
+          yAxis={[{ width: 100, valueFormatter: thousandSeparatorFormatter }]}
           series={[
             { dataKey: 'age0_17', label: '0-17' },
             { dataKey: 'age18_64', label: '18-64' },
@@ -77,11 +86,11 @@ function PopulationChart({data}) {
           dataset={populationByYear}
           grid={{ vertical: true, horizontal: true }}
           xAxis={[{ dataKey: 'year' }]}
-          yAxis={[{ width: 100, valueFormatter }]}
+          yAxis={[{ width: 100, valueFormatter: percentageFormatter }]}
           series={[
-            { dataKey: 'age0_17_relative', label: '0-17', valueFormatter },
-            { dataKey: 'age18_64_relative', label: '18-64', valueFormatter },
-            { dataKey: 'age65plus_relative', label: '65+', valueFormatter },
+            { dataKey: 'age0_17_relative', label: '0-17', valueFormatter: percentageFormatter },
+            { dataKey: 'age18_64_relative', label: '18-64', valueFormatter: percentageFormatter },
+            { dataKey: 'age65plus_relative', label: '65+', valueFormatter: percentageFormatter },
           ]}
           height={300}
         />
