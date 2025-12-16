@@ -12,9 +12,27 @@ function PopulationChart({data, startYear, endYear}) {
 
   const percentageFormatter = (value) => `${(value*100).toFixed(1)}%`
 
-  const thousandSeparatorFormatter = (value) => new Intl.NumberFormat().format(value);
+  const numberFormatter = (value) => new Intl.NumberFormat().format(value);
+
+  const plusFormatter = (value) => {
+    if (value > 0) {
+      return "+" + numberFormatter(value).toString();
+    } else {
+      return numberFormatter(value).toString();
+    }
+  }
 
   const [ageGroupView, setAgeGroupView] = useState("numbers");
+
+  const [populationChange_0_17, setPopulationChange_0_17] = useState(0);
+  const [populationChange_18_64, setPopulationChange_18_64] = useState(0);
+  const [populationChange_65plus, setPopulationChange_65plus] = useState(0);
+  const [percentageChange_0_17, setPercentageChange_0_17] = useState(0);
+  const [percentageChange_18_64, setPercentageChange_18_64] = useState(0);
+  const [percentageChange_65plus, setPercentageChange_65plus] = useState(0);
+  const [relativeChange_0_17, setRelativeChange_0_17] = useState(0);
+  const [relativeChange_18_64, setRelativeChange_18_64] = useState(0);
+  const [relativeChange_65plus, setRelativeChange_65plus] = useState(0);
 
   Object.entries(data.populationByYear).map(entry => {
 
@@ -29,16 +47,38 @@ function PopulationChart({data, startYear, endYear}) {
         age18_64_relative: entry[1].age18_64 / entry[1].total,
         age65plus_relative: entry[1].age65plus / entry[1].total,
       })
-    }    
-  })
+    }
+  }) 
 
+  const start = populationByYear.find(obj => obj.year == startYear)
+  const end = populationByYear.find(obj => obj.year == endYear)
+
+  if (populationChange_0_17 != end["age0_17"] - start["age0_17"]) {
+    setPopulationChange_0_17(end["age0_17"] - start["age0_17"]);
+    setPercentageChange_0_17((end["age0_17"] - start["age0_17"])/start["age0_17"]);
+    setRelativeChange_0_17((end["age0_17_relative"] - start["age0_17_relative"]));
+  }
+
+  if (populationChange_18_64 != end["age18_64"] - start["age18_64"]) {
+    setPopulationChange_18_64(end["age18_64"] - start["age18_64"]);
+    setPercentageChange_18_64((end["age18_64"] - start["age18_64"])/start["age18_64"]);
+    setRelativeChange_18_64((end["age18_64_relative"] - start["age18_64_relative"]));
+  }
+
+  if(populationChange_65plus != end["age65plus"] - start["age65plus"]) {
+    setPopulationChange_65plus(end["age65plus"] - start["age65plus"]);
+    setPercentageChange_65plus((end["age65plus"] - start["age65plus"])/start["age65plus"]);
+    setRelativeChange_65plus((end["age65plus_relative"] - start["age65plus_relative"]));
+  }
+  
   const handleChange = (event) => {
     setAgeGroupView(event.target.value);
   };
 
+
   return (
     <div>
-      <h4>Kokonaisväestö</h4>
+      <h3>Kokonaisväestö</h3>
       <LineChart
         dataset = {populationByYear}
         grid={{ vertical: true, horizontal: true }}
@@ -47,7 +87,7 @@ function PopulationChart({data, startYear, endYear}) {
           valueFormatter: (value) => value.toString(),
           tickMinStep: 1
         }]}
-        yAxis={[{ width: 100, valueFormatter: thousandSeparatorFormatter }]}
+        yAxis={[{ width: 100, valueFormatter: numberFormatter }]}
         series={[
           {
             dataKey: 'total',
@@ -55,13 +95,11 @@ function PopulationChart({data, startYear, endYear}) {
         ]}
         height={300}
       />
-      <h4>Väestö ikäryhmittäin</h4>
+      <h3>Väestö ikäryhmittäin</h3>
        <FormControl>
         <FormLabel id="select-agegroup-view">Näytä</FormLabel>
         <RadioGroup
-          aria-labelledby="demo-radio-buttons-group-label"
           defaultValue="numbers"
-          name="radio-buttons-group"
           value={ageGroupView}
           onChange={handleChange}
         >
@@ -74,7 +112,7 @@ function PopulationChart({data, startYear, endYear}) {
           dataset={populationByYear}
           grid={{ vertical: true, horizontal: true }}
           xAxis={[{ dataKey: 'year' }]}
-          yAxis={[{ width: 100, valueFormatter: thousandSeparatorFormatter }]}
+          yAxis={[{ width: 100, valueFormatter: numberFormatter }]}
           series={[
             { dataKey: 'age0_17', label: '0-17' },
             { dataKey: 'age18_64', label: '18-64' },
@@ -94,8 +132,19 @@ function PopulationChart({data, startYear, endYear}) {
           ]}
           height={300}
         />
-    
-    }
+      } <div>
+          <h4>Muutokset ikäryhmittäin</h4>
+          <p><strong>0-17 -vuotiaat:</strong></p>
+          <p>Lukumäärän muutos: {plusFormatter(populationChange_0_17)} ({plusFormatter((percentageChange_0_17*100).toFixed(1))} %)</p>
+          <p>Suhteellinen muutos: {plusFormatter((relativeChange_0_17*100).toFixed(1))} prosenttiyksikköä</p>
+          <p><strong>18-64-vuotiaat:</strong></p>
+          <p>Lukumäärän muutos: {plusFormatter(populationChange_18_64)} ({plusFormatter((percentageChange_18_64*100).toFixed(1))} %)</p>
+          <p>Suhteellinen muutos: {plusFormatter((relativeChange_18_64*100).toFixed(1))} prosenttiyksikköä</p>          
+          <p><strong>Yli 65-vuotiaat:</strong></p>
+          <p>Lukumäärän muutos: {plusFormatter(populationChange_65plus)} ({plusFormatter((percentageChange_65plus*100).toFixed(1))} %)</p>
+          <p>Suhteellinen muutos: {plusFormatter((relativeChange_65plus*100).toFixed(1))} prosenttiyksikköä</p>
+        </div>
+      
       
        
     </div>

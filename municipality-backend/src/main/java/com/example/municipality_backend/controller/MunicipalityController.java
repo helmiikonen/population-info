@@ -26,5 +26,6 @@ public class MunicipalityController {
     @GetMapping("/municipalities")
     public List<MunicipalityService.Municipality> getMunicipalities() {
         return this.municipalityService.getAllMunicipalities();
-    }
+    }    
+    
 }

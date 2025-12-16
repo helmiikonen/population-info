@@ -6,7 +6,8 @@ import {
   Select
  } from '@mui/material';
 
-function MunicipalityDropdown({ selectedMunicipality, setSelectedMunicipality }) {
+function MunicipalityDropdown({ selectedMunicipality, setSelectedMunicipality, includeTotal }) {
+
   const [municipalities, setMunicipalities] = useState([]);
 
   useEffect(() => {
@@ -30,7 +31,9 @@ function MunicipalityDropdown({ selectedMunicipality, setSelectedMunicipality })
         label="Valitse kunta"
         onChange={handleChange}
       >
-        <MenuItem value="SSS">Koko maa</MenuItem>
+        {includeTotal ? 
+          <MenuItem value="SSS">Koko maa</MenuItem> 
+          : <MenuItem value="SSS">Valitse kunta</MenuItem>}
         {municipalities.map(m => (
           <MenuItem value={m.code}>{m.name}</MenuItem>
         ))}

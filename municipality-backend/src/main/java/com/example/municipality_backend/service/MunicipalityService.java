@@ -46,10 +46,13 @@ public class MunicipalityService {
     	populationCache = new TreeMap<>();
     }
     
+    public void saveAllPopulationData() {
+    	
+    }
+    
     public MunicipalityData getMunicipality(String municipalityCode) {
     	
     	if (populationCache.get(municipalityCode) != null) {
-    		System.out.println("from cache");
     		return populationCache.get(municipalityCode);
     	} else {
     		try {
@@ -86,8 +89,6 @@ public class MunicipalityService {
 	
 	            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 	            String responseBody = response.body();
-	            
-	            System.out.println(responseBody);
 	            
 	            ObjectMapper mapper = new ObjectMapper();
 	            JsonNode root = mapper.readTree(responseBody);
