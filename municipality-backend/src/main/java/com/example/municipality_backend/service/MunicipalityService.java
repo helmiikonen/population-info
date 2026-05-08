@@ -17,7 +17,21 @@ import java.util.TreeMap;
 @Service
 public class MunicipalityService {
 
-    private static final String PXWEB_URL = 
+		private static MunicipalityService service = null;
+
+		private MunicipalityService() {
+			municipalitiesCache = new ArrayList<>();
+			populationCache = new TreeMap<>();
+		}
+
+		public static MunicipalityService getInstance() {
+			if (service == null) {
+				service = new MunicipalityService();
+			}
+			return service;
+		}
+
+		private static final String PXWEB_URL = 
         "https://pxdata.stat.fi/PxWeb/api/v1/fi/StatFin/tyokay/statfin_tyokay_pxt_115b.px"; // väestödata
 
     private static List<Municipality> municipalitiesCache;
@@ -42,13 +56,141 @@ public class MunicipalityService {
     	}
     }
     
-    public MunicipalityService() {
-    	populationCache = new TreeMap<>();
+    public void clearCache() {
+    	municipalitiesCache.clear();
+    	populationCache.clear();
     }
     
-    public void saveAllPopulationData() {
-    	
-    }
+	
+	public List<MunicipalityData> getData() {
+		if (populationCache.size() == getAllMunicipalities().size()) {
+			System.out.println("heyy");
+			
+		} else {
+			System.out.println(populationCache.size());
+			System.out.println(getAllMunicipalities().size());
+			try {
+				HttpClient client = HttpClient.newHttpClient();
+				String jsonBody = 
+					"""	
+					{
+					  "query": [
+					    {
+					      "code": "Alue",
+					      "selection": {
+					        "filter": "all",
+					        "values": ["*"]
+					      }
+					    },
+					    {
+					      "code": "Ikä",
+					      "selection": {
+					        "filter": "all",
+					        "values": ["*"]
+					      }
+					    }
+					  ],
+					  "response": {
+					    "format": "json-stat2"
+					  }
+					}
+							
+					""";
+				
+				HttpRequest request = HttpRequest.newBuilder()
+	                .uri(URI.create(PXWEB_URL))
+	                .header("Content-Type", "application/json")
+	                .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+	                .build();
+		
+		        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+		        String responseBody = response.body();
+		        
+		        ObjectMapper mapper = new ObjectMapper();
+		        JsonNode root = mapper.readTree(responseBody);
+		        
+		        System.out.println(root);
+		        
+		        JsonNode sizes = root.get("size");
+		        int nAreas = sizes.get(0).asInt();
+		        int nAges = sizes.get(1).asInt();
+		        int nYears = sizes.get(2).asInt();
+		       
+		        JsonNode dimension = root.get("dimension");
+		        
+		        System.out.println(sizes);
+		        System.out.println(dimension);
+		        
+		        JsonNode areaDimension = dimension.get("Alue").get("category").get("index");
+	            JsonNode ageDimension = dimension.get("Ikä").get("category").get("index");
+	            JsonNode yearDimension = dimension.get("Vuosi").get("category").get("index");
+	            JsonNode values = root.get("value");
+	            
+	            System.out.println("VALUES: " + values);
+	            
+	            List<String> years = new ArrayList<>();
+	            yearDimension.fieldNames().forEachRemaining(obj -> years.add(obj));
+	
+	            List<String> ages = new ArrayList<>();
+	            ageDimension.fieldNames().forEachRemaining(obj -> ages.add(obj));
+	            
+	            System.out.println(areaDimension);
+	            System.out.println(ageDimension);
+	            System.out.println(yearDimension);
+	            
+	            System.out.println(ages);
+	            System.out.println(years);
+	            
+	            JsonNode municipalities = dimension.get("Alue").get("category").get("label");
+	            List<String> municipalityCodes = new ArrayList<>();
+	            List<String> municipalityNames = new ArrayList<>();
+	            municipalities.fieldNames().forEachRemaining(obj -> municipalityCodes.add(obj));
+	            municipalities.values().forEachRemaining(obj -> municipalityNames.add(obj.toString()));
+	            
+	            System.out.println(municipalityCodes);
+	            System.out.println(municipalityNames);
+	            
+	            for (int i=0; i<municipalityCodes.size(); i++) {
+	            	String municipalityCode = municipalityCodes.get(i);
+	            	String municipalityName = municipalityNames.get(i);
+	            	if (municipalityName.charAt(0) == '"') {
+	            		String newString = municipalityName.substring(1, municipalityName.length()-1);
+	            		municipalityName = newString;
+	            	}
+	            	if (municipalityCode != "SSS") {
+		            	MunicipalityData data = new MunicipalityData(municipalityCode, municipalityName);
+		            	for (int j=0; j<nYears; j++) {
+		            		int year = Integer.parseInt(years.get(j));
+		            		PopulationRecord record = new PopulationRecord(year);
+		            		for (int k=0; k<nAges; k++) {
+			                    String ageGroup = ages.get(k);
+			                    int valueIndex = (i * nYears * nAges) + j + (k * nYears);
+			                    
+			                    int count = values.get(valueIndex).asInt();
+			                    
+			                    switch(ageGroup) {
+			                        case "SSS": record.setTotal(count); break;
+			                        case "0-17": record.setAge0_17(count); break;
+			                        case "18-64": record.setAge18_64(count); break;
+			                        case "65-": record.setAge65plus(count); break;
+			                    }
+				            }
+		            		data.addRecord(record);
+		            	}
+		            	populationCache.put(municipalityCode, data);
+	            	}
+	            	
+	            }
+	            System.out.println(populationCache.size());
+	            
+			} catch (Exception e) {
+	            e.printStackTrace();
+	        }
+		}
+		return new ArrayList<>(populationCache.values());
+		
+	}
+
     
     public MunicipalityData getMunicipality(String municipalityCode) {
     	
@@ -70,8 +212,8 @@ public class MunicipalityService {
 	            		    {
 	            		      "code": "Ikä",
 	            		      "selection": {
-	            		        "filter": "item",
-	            		        "values": ["SSS", "0-17", "18-64", "65-"]
+	            		        "filter": "all",
+	            		        "values": ["*"]
 	            		      }
 	            		    }
 	            		  ],
@@ -92,6 +234,8 @@ public class MunicipalityService {
 	            
 	            ObjectMapper mapper = new ObjectMapper();
 	            JsonNode root = mapper.readTree(responseBody);
+	            
+	            //System.out.println(root);
 	
 	            // 1. Lue dimensionit
 	            JsonNode dimension = root.get("dimension");
@@ -114,7 +258,6 @@ public class MunicipalityService {
 	            JsonNode values = root.get("value");
 	
 	            // 5. Arvioi size-koordinaatit dimensionin "size"-listasta
-	            int nAreas = root.get("size").get(0).asInt();
 	            int nAges = root.get("size").get(1).asInt();
 	            int nYears = root.get("size").get(2).asInt();
 	
@@ -157,7 +300,9 @@ public class MunicipalityService {
     
     public List<Municipality> getAllMunicipalities() {
     	
-        if (municipalitiesCache != null) {
+    	System.out.println(municipalitiesCache);
+    	
+        if (municipalitiesCache != null && municipalitiesCache.size() > 0) {
             return municipalitiesCache;
         }
 

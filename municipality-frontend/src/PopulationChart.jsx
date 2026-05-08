@@ -1,10 +1,6 @@
 import { LineChart, BarChart } from '@mui/x-charts';
 import { useState } from 'react';
-import Radio from '@mui/material/Radio';
-import RadioGroup from '@mui/material/RadioGroup';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import FormControl from '@mui/material/FormControl';
-import FormLabel from '@mui/material/FormLabel';
+import { Box, Radio, RadioGroup, FormControlLabel, FormControl, FormLabel } from '@mui/material';
 
 function PopulationChart({data, startYear, endYear}) {
 
@@ -77,7 +73,7 @@ function PopulationChart({data, startYear, endYear}) {
 
 
   return (
-    <div>
+    <Box sx={{paddingBottom: 5}}>
       <h3>Kokonaisväestö</h3>
       <LineChart
         dataset = {populationByYear}
@@ -147,7 +143,7 @@ function PopulationChart({data, startYear, endYear}) {
       
       
        
-    </div>
+    </Box>
     
   );
 }

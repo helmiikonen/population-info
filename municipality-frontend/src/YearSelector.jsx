@@ -5,7 +5,7 @@ import YearDropdown from './YearDropdown';
 function YearSelector({ startYear, setStartYear, endYear, setEndYear }) {
 
   const years = []
-  for (let y=1987; y<=2023; y++){
+  for (let y=1987; y<=2024; y++){
     years.push(y);
   }
 
@@ -15,7 +15,7 @@ function YearSelector({ startYear, setStartYear, endYear, setEndYear }) {
   const handleStartYearChange = (event) => {
     setStartYear(event.target.value);
     const newEndYearOptions = [];
-    for (let y = event.target.value + 1; y <= 2023; y++) {
+    for (let y = event.target.value + 1; y <= 2024; y++) {
       newEndYearOptions.push(y);
     }
     setEndYearOptions(newEndYearOptions);

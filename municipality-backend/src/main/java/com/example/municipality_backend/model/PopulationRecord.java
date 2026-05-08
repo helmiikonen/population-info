@@ -13,6 +13,7 @@ public class PopulationRecord {
     }
 
     public int getYear() { return year; }
+    
     public void setTotal(int total) { this.total = total; }
     public void setAge0_17(int value) { this.age0_17 = value; }
     public void setAge18_64(int value) { this.age18_64 = value; }

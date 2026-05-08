@@ -2,13 +2,11 @@ package com.example.municipality_backend.model;
 
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.List;
 
 public class MunicipalityData {
 
     private String municipalityCode;  
     private String municipalityName;  
-    
     private Map<Integer, PopulationRecord> populationByYear = new TreeMap<>();
 
     public MunicipalityData(String code, String name) {
@@ -19,7 +17,6 @@ public class MunicipalityData {
     public MunicipalityData() {
     	
     }
-    
     
     public void printInfo() {
     	System.out.println(municipalityCode + " " + municipalityName);

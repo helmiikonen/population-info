@@ -1,12 +1,15 @@
 package com.example.municipality_backend.controller;
 
 import com.example.municipality_backend.model.MunicipalityData;
+
 import com.example.municipality_backend.service.MunicipalityService;
 
 import java.util.List;
+import java.util.TreeMap;
+import com.fasterxml.jackson.databind.JsonNode;
 
 import org.springframework.web.bind.annotation.*;
-
+import com.fasterxml.jackson.databind.JsonNode;
 @RestController
 @RequestMapping("/api")
 @CrossOrigin(origins = "http://localhost:5173")
@@ -15,7 +18,7 @@ public class MunicipalityController {
     private final MunicipalityService municipalityService;
 
     public MunicipalityController(MunicipalityService municipalityService) {
-        this.municipalityService = municipalityService;
+        this.municipalityService = MunicipalityService.getInstance();
     }
 
     @GetMapping("/municipality/{code}")
@@ -23,9 +26,15 @@ public class MunicipalityController {
         return this.municipalityService.getMunicipality(code);
     }
     
-    @GetMapping("/municipalities")
+    @GetMapping("/municipalities-list")
     public List<MunicipalityService.Municipality> getMunicipalities() {
         return this.municipalityService.getAllMunicipalities();
     }    
+
+    @GetMapping("/municipalities-data")
+    public List<MunicipalityData> getData() {
+        return this.municipalityService.getData();
+    }    
+    
     
 }

@@ -14,7 +14,7 @@ function MunicipalityViewer() {
   const [startPopulation, setStartPopulation] = useState(null);
   const [endPopulation, setEndPopulation] = useState(null);
   const [startYear, setStartYear] = useState(1987);
-  const [endYear, setEndYear] = useState(2023);
+  const [endYear, setEndYear] = useState(2024);
   const [view, setView] = useState("municipality");
   const [totalPopulation, setTotalPopulation] = useState(null);
 
@@ -30,11 +30,37 @@ function MunicipalityViewer() {
 
   const handleViewChange = (event, value) => setView(value);  
 
-  useEffect(() => {
-    if (!selectedMunicipality) {
-      return;
-    }
+  const fetchMunicipalityData = (selectedMunicipality, setData, setStart, setEnd) => {
+    
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
 
+      try {
+        fetch(`http://localhost:8080/api/municipality/${selectedMunicipality}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.municipalityCode != null) {
+            setData(data);
+            const start = data.populationByYear[startYear]["total"];
+            const end = data.populationByYear[endYear]["total"];
+            
+            setStart(start);
+            setEnd(end);
+          }          
+        })
+      } catch (err) {
+        console.error(err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }
+
+  useEffect(() => {
     if (totalPopulation == null) {
       try {
         fetch(`http://localhost:8080/api/municipality/SSS`)
@@ -47,30 +73,13 @@ function MunicipalityViewer() {
         setLoading(false);
       }
     }
-    
-    const fetchData = async () => {
-      setLoading(true);
-      setError(null);
 
-      try {
-        fetch(`http://localhost:8080/api/municipality/${selectedMunicipality}`)
-        .then(res => res.json())
-        .then(data => {
-          setPopulationData(data);
-          const start = data.populationByYear[startYear]["total"];
-          const end = data.populationByYear[endYear]["total"];
-          setStartPopulation(start);
-          setEndPopulation(end);
-        })
-      } catch (err) {
-        console.error(err);
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
+    if (!selectedMunicipality) {
+      return;
+    }
 
-    fetchData();
+    fetchMunicipalityData(selectedMunicipality, setPopulationData, setStartPopulation, setEndPopulation);
+
   }, [selectedMunicipality, startYear, endYear, totalPopulation]);
 
   return (
@@ -93,31 +102,27 @@ function MunicipalityViewer() {
           </Tabs>
         </Box>
           {view == "municipality" ? 
-          <div>
-            <p>Voit tarkastella kuntien väestömuutoksia haluamallasi aikavälillä vuosien 1987-2023 välillä.</p>
-            <Box sx={{display: 'flex', flexDirection: 'row', paddingBottom: 4}}>
-              <MunicipalityDropdown selectedMunicipality={selectedMunicipality} setSelectedMunicipality={setSelectedMunicipality} includeTotal={true} />
-              <YearSelector startYear={startYear} setStartYear={setStartYear} endYear={endYear} setEndYear={setEndYear} />
-            </Box>
-            {loading && <p>Ladataan tietoja...</p>}
-            {error && <p>Virhe: {error}</p>}
+            <div>
+              <p>Voit tarkastella kuntien väestömuutoksia haluamallasi aikavälillä vuosien 1987-2024 välillä.</p>
+              <Box sx={{display: 'flex', flexDirection: 'row', paddingBottom: 4}}>
+                <MunicipalityDropdown selectedMunicipality={selectedMunicipality} setSelectedMunicipality={setSelectedMunicipality} />
+                <YearSelector startYear={startYear} setStartYear={setStartYear} endYear={endYear} setEndYear={setEndYear} />
+              </Box>
+              {loading && <p>Ladataan tietoja...</p>}
+              {error && <p>Virhe: {error}</p>}
 
-            {selectedMunicipality != "" && populationData ? (
-              <div>
-                <h2>{populationData.municipalityName}</h2>
-                <p>Väestötiedot vuosilta {startYear}-{endYear}</p>
-                <p>Muutos tarkastelujaksolla {plusFormatter(endPopulation - startPopulation)} ({plusFormatter((((endPopulation - startPopulation) / startPopulation)*100).toFixed(2))} %)</p>
-                <PopulationChart data={populationData} startYear={startYear} endYear={endYear} />
-              </div>
-              )
-            : <></>
-            }
-          </div> 
-          : view == "comparison" ? 
-            <Box sx={{display: 'flex', flexDirection: 'column'}}>
-              <MunicipalityDropdown selectedMunicipality={selectedMunicipality} setSelectedMunicipality={setSelectedMunicipality} includeTotal={false} />
-              <Comparisons municipalityData={populationData} totalPopulation={totalPopulation} />
-            </Box>
+              {selectedMunicipality != "" && populationData ? (
+                <div>
+                  <h2>{populationData.municipalityName}</h2>
+                  <p>Väestötiedot vuosilta {startYear}-{endYear}</p>
+                  <p>Muutos tarkastelujaksolla {plusFormatter(endPopulation - startPopulation)} ({plusFormatter((((endPopulation - startPopulation) / startPopulation)*100).toFixed(2))} %)</p>
+                  <PopulationChart data={populationData} startYear={startYear} endYear={endYear} />
+                </div>
+                )
+              : <></>
+              }
+            </div> 
+          : view == "comparison" ? <Comparisons selectedMunicipality={selectedMunicipality} setSelectedMunicipality={setSelectedMunicipality} fetchMunicipalityData={fetchMunicipalityData}/>
           : view == "summary" ? <Summary /> : <></>
         }
           

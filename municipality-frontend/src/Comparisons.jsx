@@ -1,52 +1,80 @@
 import { Box } from '@mui/material';
 import YearDropdown from './YearDropdown';
-import { useState } from 'react';
+import MunicipalityDropdown from './MunicipalityDropdown';
+import { useState, useEffect } from 'react';
+import ComparisonPopulationChart from './ComparisonPopulationChart';
 
-function Comparisons({municipalityData, totalPopulation}) {
+function Comparisons({selectedMunicipality, setSelectedMunicipality, fetchMunicipalityData}) {
 
   const years = []
-  for (let y=1987; y<=2023; y++){
+  for (let y=1987; y<=2024; y++){
     years.push(y);
   }
 
-  const thousandSeparatorFormatter = (value) => new Intl.NumberFormat().format(value);
+  const [municipality1, setMunicipality1] = useState(selectedMunicipality || null);
 
-  const [selectedYear, setSelectedYear] = useState(2023);
+  const [municipality2, setMunicipality2] = useState("SSS");
 
-  const [yearlyMunicipalityInfo, setYearlyMunicipalityInfo] = useState(
-    municipalityData.populationByYear[selectedYear]
-  );
-  const [yearlyTotalInfo, setYearlyTotalInfo] = useState(
-    totalPopulation.populationByYear[selectedYear]
-  );
+  const [endYear, setEndYear] = useState(2024);
 
-  const handleYearChange = (event) => {
-    setSelectedYear(event.target.value);
-    setYearlyMunicipalityInfo(municipalityData.populationByYear[selectedYear]);
-    setYearlyTotalInfo(totalPopulation.populationByYear[selectedYear]);
+  const [startYear, setStartYear] = useState(1987);
+
+  const [municipality1Data, setMunicipality1Data] = useState(null);
+
+  const [municipality2Data, setMunicipality2Data] = useState(null);
+
+  const [startPopulation1, setStartPopulation1] = useState(null);
+
+  const [endPopulation1, setEndPopulation1] = useState(null);
+
+  const [startPopulation2, setStartPopulation2] = useState(null);
+
+  const [endPopulation2, setEndPopulation2] = useState(null);
+
+  const changeStartYear = (event) => {
+    setStartYear(event.target.value);
+  }
+  
+  const changeEndYear = (event) => {
+    setEndYear(event.target.value);
   }
 
-  if (yearlyMunicipalityInfo["total"] != municipalityData.populationByYear[selectedYear]["total"]) {
-    setYearlyMunicipalityInfo(municipalityData.populationByYear[selectedYear]);
-    setYearlyTotalInfo(totalPopulation.populationByYear[selectedYear]);
+  useEffect(() => {
+    fetchMunicipalityData(municipality1, setMunicipality1Data, setStartPopulation1, setEndPopulation1);
+    fetchMunicipalityData(municipality2, setMunicipality2Data, setStartPopulation2, setEndPopulation2);
+    setSelectedMunicipality(municipality1);
 
-  }
+  }, [municipality1, municipality2, startYear, endYear]);
+
 
   return (
-    <Box sx={{marginTop: 5}}>
-      {municipalityData.municipalityCode !== ("SSS") ? 
+    <Box sx={{display: 'flex', flexDirection: 'column'}}>
+      <p>Vertaile valitsemiesi kuntien väestömuutoksia haluamallasi aikavälillä</p>
+      <Box sx={{display: 'flex', flexDirection: 'row', paddingY: 4}}>
+        <MunicipalityDropdown selectedMunicipality={municipality1} setSelectedMunicipality={setMunicipality1}/>
+        <MunicipalityDropdown selectedMunicipality={municipality2} setSelectedMunicipality={setMunicipality2}/> 
+        <YearDropdown yearOptions={years} defaultValue={startYear} labelText="Alkaen" handleChange={changeStartYear}/>   
+        <YearDropdown yearOptions={years} defaultValue={endYear} labelText="Päättyen" handleChange={changeEndYear}/>
+      </Box>
+      <Box sx={{marginTop: 5}}>
+        {municipality1Data && municipality2Data ?
+        municipality1 == "SSS" && municipality2 == "SSS" ?
+        <h3>Valitse vertailtavat kunnat</h3>
+        :
+        municipality1 == "SSS" || municipality2 == "SSS" ?
         <div>
-          <h2>{municipalityData.municipalityName}</h2>
-          <Box sx={{display: 'flex', flexDirection: 'row', marginBottom: 3}}>
-            <p>Valitse vuosi</p>
-            <YearDropdown yearOptions={years} defaultValue={selectedYear} labelText="" handleChange={handleYearChange}/>
-          </Box>
-          <h4>Vuonna {selectedYear}:</h4>
-          <p>Kunnan väkiluku oli {thousandSeparatorFormatter(yearlyMunicipalityInfo["total"])}</p>
-          <p>Se on {((yearlyMunicipalityInfo["total"] / yearlyTotalInfo["total"])*100).toFixed(2)} % koko maan väestöstä, joka oli {thousandSeparatorFormatter(yearlyTotalInfo["total"])}</p>
+          <h3>Vertaillaan kunnan {municipality1 == "SSS" ? municipality2Data.municipalityName : municipality1Data.municipalityName} väestöä koko maan väestöön aikavälillä {startYear}-{endYear}</h3>
+          <ComparisonPopulationChart data1={municipality1Data} data2={municipality2Data} startYear={startYear} endYear={endYear}/>
         </div>
-        : <p>Valitse kunta, jonka väestötietoja haluat vertailla koko maan väestöön</p>
+        :
+        <div>
+          <h3>Vertaillaan kuntia {municipality1Data.municipalityName} ja {municipality2Data.municipalityName} aikavälillä {startYear}-{endYear}</h3>
+          <ComparisonPopulationChart data1={municipality1Data} data2={municipality2Data} startYear={startYear} endYear={endYear}/>
+        </div>
+        :<></>
       }
+        
+      </Box>
     </Box>
   )
 

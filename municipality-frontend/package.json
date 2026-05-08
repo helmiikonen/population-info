@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "concurrently \"npm run dev\" \"npm run start-backend\"",
+    "start-backend": "cd ../municipality-backend && mvnw.cmd spring-boot:run"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
