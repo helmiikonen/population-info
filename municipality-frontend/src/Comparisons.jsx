@@ -4,80 +4,152 @@ import MunicipalityDropdown from './MunicipalityDropdown';
 import { useState, useEffect } from 'react';
 import ComparisonPopulationChart from './ComparisonPopulationChart';
 
-function Comparisons({selectedMunicipality, setSelectedMunicipality, fetchMunicipalityData}) {
+function Comparisons({selectedMunicipality, setSelectedMunicipality}) {
 
-  const years = []
-  for (let y=1987; y<=2024; y++){
-    years.push(y);
-  }
-
-  const [municipality1, setMunicipality1] = useState(selectedMunicipality || null);
+  const [municipality1, setMunicipality1] = useState(
+    selectedMunicipality || "SSS"
+  );
 
   const [municipality2, setMunicipality2] = useState("SSS");
 
-  const [endYear, setEndYear] = useState(2024);
-
-  const [startYear, setStartYear] = useState(1987);
+  const [startYear, setStartYear] = useState(2003);
+  const [endYear, setEndYear] = useState(2025);
+  
+  const years = []
+  for (let y = startYear; y <= endYear; y++) {
+    years.push(y);
+  }
 
   const [municipality1Data, setMunicipality1Data] = useState(null);
-
   const [municipality2Data, setMunicipality2Data] = useState(null);
 
-  const [startPopulation1, setStartPopulation1] = useState(null);
-
-  const [endPopulation1, setEndPopulation1] = useState(null);
-
-  const [startPopulation2, setStartPopulation2] = useState(null);
-
-  const [endPopulation2, setEndPopulation2] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const changeStartYear = (event) => {
-    setStartYear(event.target.value);
-  }
-  
+    const year = Number(event.target.value);
+
+    setStartYear(year);
+
+    if (year >= endYear) {
+      setEndYear(Math.min(year + 1, 2025));
+    }
+  };
+
   const changeEndYear = (event) => {
-    setEndYear(event.target.value);
-  }
+    const year = Number(event.target.value);
+
+    setEndYear(year);
+
+    if (year <= startYear) {
+      setStartYear(Math.max(year - 1, 2003));
+    }
+  };
 
   useEffect(() => {
-    fetchMunicipalityData(municipality1, setMunicipality1Data, setStartPopulation1, setEndPopulation1);
-    fetchMunicipalityData(municipality2, setMunicipality2Data, setStartPopulation2, setEndPopulation2);
+    let cancelled = false;
+
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const [response1, response2] = await Promise.all([
+          fetch(`http://localhost:8080/api/municipality/${municipality1}`),
+          fetch(`http://localhost:8080/api/municipality/${municipality2}`)
+        ]);
+
+        if (!response1.ok || !response2.ok) {
+          throw new Error("Kuntatietojen hakeminen epäonnistui.");
+        }
+
+        const [data1, data2] = await Promise.all([
+          response1.json(),
+          response2.json()
+        ]);
+
+        if (!cancelled) {
+          setMunicipality1Data(data1);
+          setMunicipality2Data(data2);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err.message);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [municipality1, municipality2]);
+
+  useEffect(() => {
     setSelectedMunicipality(municipality1);
-
-  }, [municipality1, municipality2, startYear, endYear]);
-
+  }, [municipality1, setSelectedMunicipality]);
 
   return (
-    <Box sx={{display: 'flex', flexDirection: 'column'}}>
+    <Box sx={{ display: 'flex', flexDirection: 'column' }}>
       <p>Vertaile valitsemiesi kuntien väestömuutoksia haluamallasi aikavälillä</p>
-      <Box sx={{display: 'flex', flexDirection: 'row', paddingY: 4}}>
-        <MunicipalityDropdown selectedMunicipality={municipality1} setSelectedMunicipality={setMunicipality1}/>
-        <MunicipalityDropdown selectedMunicipality={municipality2} setSelectedMunicipality={setMunicipality2}/> 
-        <YearDropdown yearOptions={years} defaultValue={startYear} labelText="Alkaen" handleChange={changeStartYear}/>   
-        <YearDropdown yearOptions={years} defaultValue={endYear} labelText="Päättyen" handleChange={changeEndYear}/>
-      </Box>
-      <Box sx={{marginTop: 5}}>
-        {municipality1Data && municipality2Data ?
-        municipality1 == "SSS" && municipality2 == "SSS" ?
-        <h3>Valitse vertailtavat kunnat</h3>
-        :
-        municipality1 == "SSS" || municipality2 == "SSS" ?
-        <div>
-          <h3>Vertaillaan kunnan {municipality1 == "SSS" ? municipality2Data.municipalityName : municipality1Data.municipalityName} väestöä koko maan väestöön aikavälillä {startYear}-{endYear}</h3>
-          <ComparisonPopulationChart data1={municipality1Data} data2={municipality2Data} startYear={startYear} endYear={endYear}/>
-        </div>
-        :
-        <div>
-          <h3>Vertaillaan kuntia {municipality1Data.municipalityName} ja {municipality2Data.municipalityName} aikavälillä {startYear}-{endYear}</h3>
-          <ComparisonPopulationChart data1={municipality1Data} data2={municipality2Data} startYear={startYear} endYear={endYear}/>
-        </div>
-        :<></>
-      }
-        
-      </Box>
-    </Box>
-  )
 
+      <Box sx={{ display: 'flex', flexDirection: 'row', paddingY: 4 }}>
+        <MunicipalityDropdown
+          selectedMunicipality={municipality1}
+          setSelectedMunicipality={setMunicipality1}
+        />
+
+        <MunicipalityDropdown
+          selectedMunicipality={municipality2}
+          setSelectedMunicipality={setMunicipality2}
+        />
+
+        <YearDropdown
+          yearOptions={years.filter(year => year < endYear)}
+          defaultValue={startYear}
+          labelText="Alkaen"
+          handleChange={changeStartYear}
+        />
+
+        <YearDropdown
+          yearOptions={years.filter(year => year > startYear)}
+          defaultValue={endYear}
+          labelText="Päättyen"
+          handleChange={changeEndYear}
+        />
+      </Box>
+
+      {loading && <p>Haetaan kuntien väestötietoja...</p>}
+
+      {error && <p>Virhe: {error}</p>}
+
+      {municipality1Data && municipality2Data && !loading && !error && (
+        municipality1 === "SSS" && municipality2 === "SSS" ? (
+          <h3>Valitse vertailtavat kunnat</h3>
+        ) : (
+          <Box sx={{ marginTop: 5 }}>
+            <h3>
+              Vertaillaan kuntia {municipality1Data.municipalityName} ja{" "}
+              {municipality2Data.municipalityName} aikavälillä{" "}
+              {startYear}-{endYear}
+            </h3>
+
+            <ComparisonPopulationChart
+              data1={municipality1Data}
+              data2={municipality2Data}
+              startYear={startYear}
+              endYear={endYear}
+            />
+          </Box>
+        )
+      )}
+    </Box>
+  );
 }
 
 export default Comparisons;

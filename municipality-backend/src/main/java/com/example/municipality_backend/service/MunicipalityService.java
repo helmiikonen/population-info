@@ -13,26 +13,199 @@ import java.net.http.HttpResponse;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.TreeMap;
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 public class MunicipalityService {
 
-		private static MunicipalityService service = null;
+	private static MunicipalityService service = null;
 
-		private MunicipalityService() {
-			municipalitiesCache = new ArrayList<>();
-			populationCache = new TreeMap<>();
+	private MunicipalityService() {
+		municipalitiesCache = new ArrayList<>();
+		populationCache = new TreeMap<>();
+	}
+
+	public static MunicipalityService getInstance() {
+		if (service == null) {
+			service = new MunicipalityService();
 		}
+		return service;
+	}
+	
+	private int getValue(
+	        JsonNode root,
+	        Map<String, Integer> coordinates) {
 
-		public static MunicipalityService getInstance() {
-			if (service == null) {
-				service = new MunicipalityService();
-			}
-			return service;
-		}
+	    JsonNode ids = root.get("id");
+	    JsonNode sizes = root.get("size");
 
-		private static final String PXWEB_URL = 
-        "https://pxdata.stat.fi/PxWeb/api/v1/fi/StatFin/tyokay/statfin_tyokay_pxt_115b.px"; // väestödata
+	    int index = 0;
+
+	    for (int i = 0; i < ids.size(); i++) {
+	        String dimensionName = ids.get(i).asText();
+	        int dimensionSize = sizes.get(i).asInt();
+
+	        int coordinate = coordinates.getOrDefault(dimensionName, 0);
+
+	        index = index * dimensionSize + coordinate;
+	    }
+
+	    JsonNode value = root.get("value").get(index);
+
+	    return value == null || value.isNull() ? 0 : value.asInt();
+	}
+	
+	private int getCategoryIndex(
+	        JsonNode root,
+	        String dimensionName,
+	        String code) {
+
+	    return root.get("dimension")
+	            .get(dimensionName)
+	            .get("category")
+	            .get("index")
+	            .get(code)
+	            .asInt();
+	}
+
+	private MunicipalityData parseMunicipalityData(
+	        JsonNode root,
+	        String municipalityCode) {
+
+	    JsonNode dimension = root.get("dimension");
+
+	    // Kunnan nimi
+	    String municipalityName = dimension
+	            .get("kunta_85_20190101")
+	            .get("category")
+	            .get("label")
+	            .get(municipalityCode)
+	            .asText();
+
+	    MunicipalityData data =
+	            new MunicipalityData(municipalityCode, municipalityName);
+
+	    // Vuodet API:n indeksien mukaan järjestettynä
+	    JsonNode yearIndex = dimension
+	            .get("timeperiod_y")
+	            .get("category")
+	            .get("index");
+
+	    List<String> years = new ArrayList<>();
+
+	    yearIndex.fieldNames().forEachRemaining(years::add);
+
+	    years.sort((a, b) ->
+	            Integer.compare(
+	                    yearIndex.get(a).asInt(),
+	                    yearIndex.get(b).asInt()
+	            )
+	    );
+
+	    // Kunnan indeksi
+	    int areaIndex = getCategoryIndex(
+	            root, "kunta_85_20190101", municipalityCode);
+
+	    // Sukupuoli on Yhteensä
+	    int sexIndex = getCategoryIndex(
+	            root, "sukupuoli_9_20180101", "SSS");
+
+	    // Tiedot on Väestö
+	    int contentsIndex = getCategoryIndex(
+	            root, "contentscode", "vaerak-vaesto");
+
+	    for (String yearString : years) {
+
+	        int year = Integer.parseInt(yearString);
+
+	        PopulationRecord record = new PopulationRecord(year);
+
+	        int yearPosition = getCategoryIndex(
+	                root, "timeperiod_y", yearString);
+
+	        Map<String, Integer> coordinates = new HashMap<>();
+
+	        coordinates.put("kunta_85_20190101", areaIndex);
+	        coordinates.put("timeperiod_y", yearPosition);
+	        coordinates.put("sukupuoli_9_20180101", sexIndex);
+	        coordinates.put("contentscode", contentsIndex);
+
+	        // Kokonaisväestö: ikäluokka SSS
+	        coordinates.put(
+	                "ikaryhma_10_20180101",
+	                getCategoryIndex(root, "ikaryhma_10_20180101", "SSS")
+	        );
+
+	        record.setTotal(getValue(root, coordinates));
+
+	        // Ikäryhmä 0–14
+	        int age0to14 = 0;
+
+	        for (int age = 0; age <= 14; age++) {
+	            String ageCode = String.format("%03d", age);
+
+	            coordinates.put(
+	                    "ikaryhma_10_20180101",
+	                    getCategoryIndex(
+	                            root, "ikaryhma_10_20180101", ageCode)
+	            );
+
+	            age0to14 += getValue(root, coordinates);
+	        }
+
+	        record.setAge0_14(age0to14);
+
+	        // Ikäryhmä 15–64
+	        int age15to64 = 0;
+
+	        for (int age = 15; age <= 64; age++) {
+	            String ageCode = String.format("%03d", age);
+
+	            coordinates.put(
+	                    "ikaryhma_10_20180101",
+	                    getCategoryIndex(
+	                            root, "ikaryhma_10_20180101", ageCode)
+	            );
+
+	            age15to64 += getValue(root, coordinates);
+	        }
+
+	        record.setAge15_64(age15to64);
+
+	        // Ikäryhmä 65+
+	        int age65plus = 0;
+
+	        for (int age = 65; age <= 99; age++) {
+	            String ageCode = String.format("%03d", age);
+
+	            coordinates.put(
+	                    "ikaryhma_10_20180101",
+	                    getCategoryIndex(
+	                            root, "ikaryhma_10_20180101", ageCode)
+	            );
+
+	            age65plus += getValue(root, coordinates);
+	        }
+
+	        // 100 vuotta tai enemmän
+	        coordinates.put(
+	                "ikaryhma_10_20180101",
+	                getCategoryIndex(root, "ikaryhma_10_20180101", "100-")
+	        );
+
+	        age65plus += getValue(root, coordinates);
+
+	        record.setAge65plus(age65plus);
+
+	        data.addRecord(record);
+	    }
+
+	    return data;
+	}
+	
+	private static final String PXWEB_URL = 
+    "https://pxdata.stat.fi/PxWeb/api/v1/fi/StatFin/vaerak/11rf.px"; // väestödata
 
     private static List<Municipality> municipalitiesCache;
     
@@ -62,246 +235,164 @@ public class MunicipalityService {
     }
     
 	
-	public List<MunicipalityData> getData() {
-		if (populationCache.size() == getAllMunicipalities().size()) {
-			System.out.println("heyy");
-			
-		} else {
-			System.out.println(populationCache.size());
-			System.out.println(getAllMunicipalities().size());
-			try {
-				HttpClient client = HttpClient.newHttpClient();
-				String jsonBody = 
-					"""	
-					{
-					  "query": [
-					    {
-					      "code": "Alue",
-					      "selection": {
-					        "filter": "all",
-					        "values": ["*"]
-					      }
-					    },
-					    {
-					      "code": "Ikä",
-					      "selection": {
-					        "filter": "all",
-					        "values": ["*"]
-					      }
-					    }
-					  ],
-					  "response": {
-					    "format": "json-stat2"
-					  }
-					}
-							
-					""";
-				
-				HttpRequest request = HttpRequest.newBuilder()
-	                .uri(URI.create(PXWEB_URL))
-	                .header("Content-Type", "application/json")
-	                .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
-	                .build();
-		
-		        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-		        String responseBody = response.body();
-		        
-		        ObjectMapper mapper = new ObjectMapper();
-		        JsonNode root = mapper.readTree(responseBody);
-		        
-		        System.out.println(root);
-		        
-		        JsonNode sizes = root.get("size");
-		        int nAreas = sizes.get(0).asInt();
-		        int nAges = sizes.get(1).asInt();
-		        int nYears = sizes.get(2).asInt();
-		       
-		        JsonNode dimension = root.get("dimension");
-		        
-		        System.out.println(sizes);
-		        System.out.println(dimension);
-		        
-		        JsonNode areaDimension = dimension.get("Alue").get("category").get("index");
-	            JsonNode ageDimension = dimension.get("Ikä").get("category").get("index");
-	            JsonNode yearDimension = dimension.get("Vuosi").get("category").get("index");
-	            JsonNode values = root.get("value");
-	            
-	            System.out.println("VALUES: " + values);
-	            
-	            List<String> years = new ArrayList<>();
-	            yearDimension.fieldNames().forEachRemaining(obj -> years.add(obj));
-	
-	            List<String> ages = new ArrayList<>();
-	            ageDimension.fieldNames().forEachRemaining(obj -> ages.add(obj));
-	            
-	            System.out.println(areaDimension);
-	            System.out.println(ageDimension);
-	            System.out.println(yearDimension);
-	            
-	            System.out.println(ages);
-	            System.out.println(years);
-	            
-	            JsonNode municipalities = dimension.get("Alue").get("category").get("label");
-	            List<String> municipalityCodes = new ArrayList<>();
-	            List<String> municipalityNames = new ArrayList<>();
-	            municipalities.fieldNames().forEachRemaining(obj -> municipalityCodes.add(obj));
-	            municipalities.values().forEachRemaining(obj -> municipalityNames.add(obj.toString()));
-	            
-	            System.out.println(municipalityCodes);
-	            System.out.println(municipalityNames);
-	            
-	            for (int i=0; i<municipalityCodes.size(); i++) {
-	            	String municipalityCode = municipalityCodes.get(i);
-	            	String municipalityName = municipalityNames.get(i);
-	            	if (municipalityName.charAt(0) == '"') {
-	            		String newString = municipalityName.substring(1, municipalityName.length()-1);
-	            		municipalityName = newString;
-	            	}
-	            	if (municipalityCode != "SSS") {
-		            	MunicipalityData data = new MunicipalityData(municipalityCode, municipalityName);
-		            	for (int j=0; j<nYears; j++) {
-		            		int year = Integer.parseInt(years.get(j));
-		            		PopulationRecord record = new PopulationRecord(year);
-		            		for (int k=0; k<nAges; k++) {
-			                    String ageGroup = ages.get(k);
-			                    int valueIndex = (i * nYears * nAges) + j + (k * nYears);
-			                    
-			                    int count = values.get(valueIndex).asInt();
-			                    
-			                    switch(ageGroup) {
-			                        case "SSS": record.setTotal(count); break;
-			                        case "0-17": record.setAge0_17(count); break;
-			                        case "18-64": record.setAge18_64(count); break;
-			                        case "65-": record.setAge65plus(count); break;
-			                    }
-				            }
-		            		data.addRecord(record);
-		            	}
-		            	populationCache.put(municipalityCode, data);
-	            	}
-	            	
-	            }
-	            System.out.println(populationCache.size());
-	            
-			} catch (Exception e) {
-	            e.printStackTrace();
-	        }
-		}
-		return new ArrayList<>(populationCache.values());
-		
-	}
+    public List<MunicipalityData> getData() {
 
+        List<Municipality> municipalities = getAllMunicipalities();
+
+        // Tarkistetaan, löytyvätkö kaikkien kuntien tiedot jo välimuistista.
+        if (populationCache.size() == municipalities.size() + 1) {
+            return new ArrayList<>(populationCache.values());
+        }
+
+        try {
+            HttpClient client = HttpClient.newHttpClient();
+            ObjectMapper mapper = new ObjectMapper();
+
+            // Haetaan 25 kuntaa yhdessä pyynnössä.
+            final int batchSize = 25;
+
+            populationCache.clear();
+
+            // Käydään kunnat läpi 25 kunnan erissä.
+            for (int i = 0; i < municipalities.size(); i += batchSize) {
+
+                int end = Math.min(i + batchSize, municipalities.size());
+
+                List<Municipality> batch =
+                        municipalities.subList(i, end);
+
+                // Lisätään mukaan myös koko maa (SSS).
+                List<String> municipalityCodes = new ArrayList<>();
+                municipalityCodes.add("SSS");
+
+                for (Municipality municipality : batch) {
+                    municipalityCodes.add(municipality.getCode());
+                }
+
+                // Muodostetaan kuntakoodien JSON-lista.
+                String areaValuesJson = String.join(",",
+                        municipalityCodes.stream()
+                                .map(code -> "\"" + code + "\"")
+                                .toList()
+                );
+
+                String jsonBody = """
+                {
+                  "query": [
+                    {
+                      "code": "kunta_85_20190101",
+                      "selection": {
+                        "filter": "item",
+                        "values": [%s]
+                      }
+                    },
+                    {
+                      "code": "timeperiod_y",
+                      "selection": {
+                        "filter": "all",
+                        "values": ["*"]
+                      }
+                    },
+                    {
+                      "code": "sukupuoli_9_20180101",
+                      "selection": {
+                        "filter": "item",
+                        "values": ["SSS"]
+                      }
+                    },
+                    {
+                      "code": "ikaryhma_10_20180101",
+                      "selection": {
+                        "filter": "all",
+                        "values": ["*"]
+                      }
+                    },
+                    {
+                      "code": "contentscode",
+                      "selection": {
+                        "filter": "item",
+                        "values": ["vaerak-vaesto"]
+                      }
+                    }
+                  ],
+                  "response": {
+                    "format": "json-stat2"
+                  }
+                }
+                """.formatted(areaValuesJson);
+
+                // Lähetetään API-pyyntö.
+                HttpRequest request = HttpRequest.newBuilder()
+                        .uri(URI.create(PXWEB_URL))
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+                        .build();
+
+                HttpResponse<String> response = client.send(
+                        request,
+                        HttpResponse.BodyHandlers.ofString()
+                );
+
+                // Tarkistetaan vastauksen onnistuminen.
+                if (response.statusCode() != 200) {
+                    throw new RuntimeException(
+                            "Tilastokeskuksen API-virhe: "
+                            + response.statusCode()
+                            + " - " + response.body()
+                    );
+                }
+
+                // Luetaan JSON-vastaus.
+                JsonNode root = mapper.readTree(response.body());
+
+                // Poimitaan jokaisen kunnan väestötiedot.
+                for (String municipalityCode : municipalityCodes) {
+
+                    MunicipalityData data = parseMunicipalityData(
+                            root,
+                            municipalityCode
+                    );
+
+                    populationCache.put(municipalityCode, data);
+                }
+            }
+
+            return new ArrayList<>(populationCache.values());
+
+        } catch (Exception e) {
+
+            System.err.println("Väestötietojen hakeminen epäonnistui!");
+            e.printStackTrace();
+
+            return new ArrayList<>();
+        }
+    }
     
     public MunicipalityData getMunicipality(String municipalityCode) {
-    	
-    	if (populationCache.get(municipalityCode) != null) {
-    		return populationCache.get(municipalityCode);
-    	} else {
-    		try {
-	            HttpClient client = HttpClient.newHttpClient();
-	            String jsonBody = """
-	            		{
-	            		  "query": [
-	            		    {
-	            		      "code": "Alue",
-	            		      "selection": {
-	            		        "filter": "item",
-	            		        "values": ["%s"]
-	            		      }
-	            		    },
-	            		    {
-	            		      "code": "Ikä",
-	            		      "selection": {
-	            		        "filter": "all",
-	            		        "values": ["*"]
-	            		      }
-	            		    }
-	            		  ],
-	            		  "response": {
-	            		    "format": "json-stat2"
-	            		  }
-	            		}
-	            		""".formatted(municipalityCode);
-	
-	            HttpRequest request = HttpRequest.newBuilder()
-	                    .uri(URI.create(PXWEB_URL))
-	                    .header("Content-Type", "application/json")
-	                    .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
-	                    .build();
-	
-	            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-	            String responseBody = response.body();
-	            
-	            ObjectMapper mapper = new ObjectMapper();
-	            JsonNode root = mapper.readTree(responseBody);
-	            
-	            //System.out.println(root);
-	
-	            // 1. Lue dimensionit
-	            JsonNode dimension = root.get("dimension");
-	            JsonNode areaDimension = dimension.get("Alue").get("category").get("index");
-	            JsonNode ageDimension = dimension.get("Ikä").get("category").get("index");
-	            JsonNode yearDimension = dimension.get("Vuosi").get("category").get("index");
-	
-	            // 2. Tee käänteiset mapit koodista nimeen
-	            String municipalityName = dimension.get("Alue").get("category").get("label").get(municipalityCode).asText();
-	            MunicipalityData data = new MunicipalityData(municipalityCode, municipalityName);
-	
-	            // 3. Luo lista vuosista ja ikäryhmistä
-	            List<String> years = new ArrayList<>();
-	            yearDimension.fieldNames().forEachRemaining(obj -> years.add(obj));
-	
-	            List<String> ages = new ArrayList<>();
-	            ageDimension.fieldNames().forEachRemaining(obj -> ages.add(obj));
-	
-	            // 4. Lue value-array
-	            JsonNode values = root.get("value");
-	
-	            // 5. Arvioi size-koordinaatit dimensionin "size"-listasta
-	            int nAges = root.get("size").get(1).asInt();
-	            int nYears = root.get("size").get(2).asInt();
-	
-	            // 6. Lue arvot kunnittain
-	            // Käytetään yksinkertaista indeksointia: value[a*nYears*nAges + age*nYears + year]
-	            int areaIndex = areaDimension.get(municipalityCode).asInt();
-	            // Luodaan populationrecord kullekin vuodelle
-	            for (int i = 0; i < nYears; i++) {
-	                int year = Integer.parseInt(years.get(i));
-	                PopulationRecord record = new PopulationRecord(year);
-	
-	                // Etsitään kyseisen vuoden väkiluku kullekin ikäryhmälle
-	                for (int j = 0; j < nAges; j++) {
-	                    String ageGroup = ages.get(j);
-	                    int valueIndex = (areaIndex * nYears * nAges) + i + (j * nYears);
-	                    
-	                    int count = values.get(valueIndex).asInt();
-	                    
-	                    switch(ageGroup) {
-	                        case "SSS": record.setTotal(count); break;
-	                        case "0-17": record.setAge0_17(count); break;
-	                        case "18-64": record.setAge18_64(count); break;
-	                        case "65-": record.setAge65plus(count); break;
-	                    }
-		            }
-		            
-		            data.addRecord(record);
-		        }
-		        
-		        populationCache.put(municipalityCode, data);		        
-		        return data;
 
-	        } catch (Exception e) {
-	            e.printStackTrace();
-	            // Palauta tyhjä data virhetilanteessa
-	            return new MunicipalityData();
-	        }
-    	}
+        // Tarkistetaan ensin, löytyykö kunta välimuistista.
+        MunicipalityData data = populationCache.get(municipalityCode);
+
+        if (data != null) {
+            return data;
+        }
+
+        // Jos välimuisti on tyhjä, haetaan kaikkien kuntien tiedot.
+        getData();
+
+        // Yritetään hakea kunta uudelleen.
+        data = populationCache.get(municipalityCode);
+
+        if (data == null) {
+            throw new IllegalArgumentException(
+                    "Kuntaa ei löytynyt: " + municipalityCode);
+        }
+
+        return data;
     }
     
     public List<Municipality> getAllMunicipalities() {
-    	
-    	System.out.println(municipalitiesCache);
-    	
+    	    	
         if (municipalitiesCache != null && municipalitiesCache.size() > 0) {
             return municipalitiesCache;
         }

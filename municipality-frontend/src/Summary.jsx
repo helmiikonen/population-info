@@ -5,7 +5,7 @@ import { Box, FormControl, InputLabel, Select, MenuItem } from '@mui/material';
 function Summary() {
 
   const years = []
-  for (let y=1987; y<=2024; y++){
+  for (let y=2003; y<=2025; y++){
     years.push(y);
   }
 
@@ -21,26 +21,31 @@ function Summary() {
 
   const thousandSeparatorFormatter = (value) => new Intl.NumberFormat().format(value);
 
-  const [startYear, setStartYear] = useState(1987);
-  const [endYear, setEndYear] = useState(2024);
+  const [startYear, setStartYear] = useState(2003);
+  const [endYear, setEndYear] = useState(2025);
 
   const [orderByTotalPopulation, setOrderByTotalPopulation] = useState(null);
   const [orderByChange, setOrderByChange] = useState(null);
   const [orderByOver65, setOrderByOver65] = useState(null);
-  const [orderBy18To64, setOrderBy18To64] = useState(null);
-  const [orderBy0To17, setOrderBy0To17] = useState(null);
+  const [orderBy15To64, setOrderBy15To64] = useState(null);
+  const [orderBy0To14, setOrderBy0To14] = useState(null);
 
   const [viewTop, setViewTop] = useState(10);
 
   const [viewData, setViewData] = useState("largest-total");
 
   const changeStartYear = (event) => {
-    setStartYear(event.target.value);
-  }
-  
+    setStartYear(Number(event.target.value));
+  };
+
   const changeEndYear = (event) => {
-    setEndYear(event.target.value);
-  }
+    setEndYear(Number(event.target.value));
+  };
+
+  const hasPopulationData = (populationData, year) => {
+    const yearData = populationData?.[year];
+    return yearData != null && Number(yearData.total) > 0;
+  };
 
   const [allData, setAllData] = useState(null);
 
@@ -52,12 +57,21 @@ function Summary() {
     setError(null);
 
     try {
-      fetch(`http://localhost:8080/api/municipalities-data`)
-      .then(res => res.json())
-      .then(data => setAllData(data))
+      const response = await fetch(
+        'http://localhost:8080/api/municipalities-data'
+      );
+
+      if (!response.ok) {
+        throw new Error(`Palvelin palautti virheen: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setAllData(data);
+
     } catch (err) {
       console.error(err);
       setError(err.message);
+
     } finally {
       setLoading(false);
     }
@@ -68,50 +82,81 @@ function Summary() {
   },[])
   
   useEffect(() => {
+    if (!allData) return;
 
-    if (allData != null) {
-      const growthOrder = []
-      const over65Order = []
-      const age18to64Order = []
-      const under18Order = []
-      const totalOrder = []
-      Object.entries(allData).map(m => {
-        const municipalityName = m[1].municipalityName
-        if (municipalityName != "KOKO MAA") {
-          const populationData = m[1].populationByYear
-          const startPopulation = populationData[startYear].total
-          const endPopulation = populationData[endYear].total
-          const over65Population = populationData[endYear].age65plus
-          const over65Percentage = (over65Population / endPopulation) * 100
-          const age18to64Population = populationData[endYear].age18_64
-          const age18to64Percentage = (age18to64Population / endPopulation) * 100
-          const under18Population = populationData[endYear].age0_17
-          const under18Percentage = (under18Population / endPopulation) * 100
-          const populationChange = ((endPopulation - startPopulation) / startPopulation)*100
-          totalOrder.push({municipalityName : municipalityName, totalPopulation: endPopulation})
-          growthOrder.push({municipalityName : municipalityName, populationChange: populationChange})
-          over65Order.push({municipalityName: municipalityName, over65Percentage: over65Percentage})
-          age18to64Order.push({municipalityName: municipalityName, age18to64Percentage: age18to64Percentage})
-          under18Order.push({municipalityName: municipalityName, under18Percentage: under18Percentage})
-        }        
-      })
-      totalOrder.sort((a, b) => a.totalPopulation - b.totalPopulation)
-      setOrderByTotalPopulation(totalOrder);
+    const growthOrder = [];
+    const over65Order = [];
+    const age15to64Order = [];
+    const under15Order = [];
+    const totalOrder = [];
 
-      growthOrder.sort((a, b) => a.populationChange - b.populationChange);
-      setOrderByChange(growthOrder);
+    Object.values(allData).forEach(municipality => {
+      // Koko maan tietoja ei oteta kuntavertailuun
+      if (municipality.municipalityName === "KOKO MAA") return;
 
-      over65Order.sort((a, b) => a.over65Percentage - b.over65Percentage);
-      setOrderByOver65(over65Order);
-      
-      age18to64Order.sort((a, b) => a.age18to64Percentage - b.age18to64Percentage)
-      setOrderBy18To64(age18to64Order);
+      const populationData = municipality.populationByYear;
 
-      under18Order.sort((a, b) => a.under18Percentage - b.under18Percentage)
-      setOrderBy0To17(under18Order);
-    }
-    
-  },[allData, startYear, endYear])
+      // Molempien vuosien pitää sisältää positiivinen väkiluku
+      const hasStartData = hasPopulationData(populationData, startYear);
+      const hasEndData = hasPopulationData(populationData, endYear);
+
+      // Nykyisen vuoden väkiluku ja ikäjakauma
+      if (hasEndData) {
+        const endPopulation = Number(populationData[endYear].total);
+
+        const over65Population = Number(populationData[endYear].age65plus);
+        const age15to64Population = Number(populationData[endYear].age15_64);
+        const under15Population = Number(populationData[endYear].age0_14);
+
+        totalOrder.push({
+          municipalityName: municipality.municipalityName,
+          totalPopulation: endPopulation
+        });
+
+        over65Order.push({
+          municipalityName: municipality.municipalityName,
+          over65Percentage: (over65Population / endPopulation) * 100
+        });
+
+        age15to64Order.push({
+          municipalityName: municipality.municipalityName,
+          age15to64Percentage: (age15to64Population / endPopulation) * 100
+        });
+
+        under15Order.push({
+          municipalityName: municipality.municipalityName,
+          under15Percentage: (under15Population / endPopulation) * 100
+        });
+      }
+
+      // Väestönmuutos lasketaan vain, jos molemmilta vuosilta löytyy väestöä
+      if (hasStartData && hasEndData) {
+        const startPopulation = Number(populationData[startYear].total);
+        const endPopulation = Number(populationData[endYear].total);
+
+        const populationChange =
+          ((endPopulation - startPopulation) / startPopulation) * 100;
+
+        growthOrder.push({
+          municipalityName: municipality.municipalityName,
+          populationChange: populationChange
+        });
+      }
+    });
+
+    totalOrder.sort((a, b) => a.totalPopulation - b.totalPopulation);
+    growthOrder.sort((a, b) => a.populationChange - b.populationChange);
+    over65Order.sort((a, b) => a.over65Percentage - b.over65Percentage);
+    age15to64Order.sort((a, b) => a.age15to64Percentage - b.age15to64Percentage);
+    under15Order.sort((a, b) => a.under15Percentage - b.under15Percentage);
+
+    setOrderByTotalPopulation(totalOrder);
+    setOrderByChange(growthOrder);
+    setOrderByOver65(over65Order);
+    setOrderBy15To64(age15to64Order);
+    setOrderBy0To14(under15Order);
+
+  }, [allData, startYear, endYear]);
 
   const handleViewChange = (event) => {
     setViewData(event.target.value);
@@ -142,16 +187,16 @@ function Summary() {
               label="Näytä tiedot"
               onChange={handleViewChange}
             >
-              <MenuItem value="largest-total">Väkiluvultaan suurimmat kunnat</MenuItem>
-              <MenuItem value="smallest-total">Väkiluvultaan pienimmät kunnat</MenuItem>
-              <MenuItem value="most-growth">Eniten kasvaneet kunnat</MenuItem>
-              <MenuItem value="least-growth">Eniten pienentyneet kunnat</MenuItem>
-              <MenuItem value="most-65+">Eniten yli 65-vuotiaita</MenuItem>
-              <MenuItem value="least-65+">Vähiten yli 65-vuotiaita</MenuItem>
-              <MenuItem value="most-18to64">Eniten 18-64-vuotiaita</MenuItem>
-              <MenuItem value="least-18to64">Vähiten 18-64-vuotiaita</MenuItem>
-              <MenuItem value="most-under18">Eniten alle 18-vuotiaita</MenuItem>
-              <MenuItem value="least-under18">Vähiten alle 18-vuotiaita</MenuItem>
+              <MenuItem key={"view-1"} value="largest-total">Väkiluvultaan suurimmat kunnat</MenuItem>
+              <MenuItem key={"view-2"} value="smallest-total">Väkiluvultaan pienimmät kunnat</MenuItem>
+              <MenuItem key={"view-3"} value="most-growth">Eniten kasvaneet kunnat</MenuItem>
+              <MenuItem key={"view-4"} value="least-growth">Eniten pienentyneet kunnat</MenuItem>
+              <MenuItem key={"view-5"} value="most-65+">Eniten yli 65-vuotiaita</MenuItem>
+              <MenuItem key={"view-6"} value="least-65+">Vähiten yli 65-vuotiaita</MenuItem>
+              <MenuItem key={"view-7"} value="most-15to64">Eniten 15-64-vuotiaita</MenuItem>
+              <MenuItem key={"view-8"} value="least-15to64">Vähiten 15-64-vuotiaita</MenuItem>
+              <MenuItem key={"view-9"} value="most-under15">Eniten alle 15-vuotiaita</MenuItem>
+              <MenuItem key={"view-10"} value="least-under15">Vähiten alle 15-vuotiaita</MenuItem>
             </Select>
           </FormControl>
           <FormControl sx={{marginX: 1, minWidth: 150}}>
@@ -164,20 +209,22 @@ function Summary() {
               onChange={handleListLengthChange}
             >
               {viewOptions.map(option => (
-                <MenuItem value={option}>{option}</MenuItem>
+                <MenuItem key={option} value={option}>{option}</MenuItem>
               ))}
             </Select>
           </FormControl>
 
         </Box>
         <Box sx={{margin: 1, paddingBottom: 5}}> 
+          {loading && <p>Ladataan kuntien väestötietoja...</p>}
+          {error && <p style={{ color: 'red' }}>Väestötietojen haku epäonnistui: {error}</p>}
           {
           viewData == "largest-total" ?
           <div>
             <h3>Väkiluvultaan suurimmat kunnat vuonna {endYear}</h3>
               {orderByTotalPopulation.toReversed().slice(0, viewTop).map(entry => {
                 index += 1;
-                return <p>{index}. {entry.municipalityName} {thousandSeparatorFormatter(entry.totalPopulation)}</p>
+                return <p key={index}>{index}. {entry.municipalityName} {thousandSeparatorFormatter(entry.totalPopulation)}</p>
               })}
           </div>
           : 
@@ -186,7 +233,7 @@ function Summary() {
             <h3>Väkiluvultaan pienimmät kunnat vuonna {endYear}</h3>
               {orderByTotalPopulation.slice(0, viewTop).map(entry => {
                 index += 1;
-                return <p>{index}. {entry.municipalityName} {thousandSeparatorFormatter(entry.totalPopulation)}</p>
+                return <p key={index}>{index}. {entry.municipalityName} {thousandSeparatorFormatter(entry.totalPopulation)}</p>
               })}
           </div>
           : 
@@ -195,7 +242,7 @@ function Summary() {
             <h3>Suhteellisesti eniten kasvaneet kunnat aikavälillä {startYear}-{endYear}</h3>
               {orderByChange.filter(entry => entry.populationChange > 0).toReversed().slice(0, viewTop).map(entry => {
                 index += 1;
-                return <p>{index}. {entry.municipalityName} {plusFormatter(entry.populationChange.toFixed(2))} %</p>
+                return <p key={index}>{index}. {entry.municipalityName} {plusFormatter(entry.populationChange.toFixed(2))} %</p>
               })}
           </div>
           : 
@@ -204,7 +251,7 @@ function Summary() {
             <h3>Suhteellisesti eniten pienentyneet kunnat aikavälillä {startYear}-{endYear}</h3>
               {orderByChange.slice(0, viewTop).map(entry => {
                 index += 1;
-                return <p>{index}. {entry.municipalityName} {plusFormatter(entry.populationChange.toFixed(2))} %</p>
+                return <p key={index}>{index}. {entry.municipalityName} {plusFormatter(entry.populationChange.toFixed(2))} %</p>
               })}
           </div>
           : 
@@ -213,7 +260,7 @@ function Summary() {
             <h3>Suhteellisesti eniten yli 65-vuotiaita vuonna {endYear}</h3>
             {orderByOver65.toReversed().slice(0, viewTop).map(entry => {
               index += 1;
-              return <p>{index}. {entry.municipalityName} {entry.over65Percentage.toFixed(2)} %</p>
+              return <p key={index}>{index}. {entry.municipalityName} {entry.over65Percentage.toFixed(2)} %</p>
             })}
           </div>
           : 
@@ -222,43 +269,43 @@ function Summary() {
             <h3>Suhteellisesti vähiten yli 65-vuotiaita vuonna {endYear}</h3>
             {orderByOver65.slice(0, viewTop).map(entry => {
               index += 1;
-              return <p>{index}. {entry.municipalityName} {entry.over65Percentage.toFixed(2)} %</p>
+              return <p key={index}>{index}. {entry.municipalityName} {entry.over65Percentage.toFixed(2)} %</p>
             })}
           </div>
           : 
-          viewData == "most-18to64" ?
+          viewData == "most-15to64" ?
           <div>
-            <h3>Suhteellisesti eniten 18-64-vuotiaita vuonna {endYear}</h3>
-            {orderBy18To64.toReversed().slice(0, viewTop).map(entry => {
+            <h3>Suhteellisesti eniten 15-64-vuotiaita vuonna {endYear}</h3>
+            {orderBy15To64.toReversed().slice(0, viewTop).map(entry => {
               index += 1;
-              return <p>{index}. {entry.municipalityName} {entry.age18to64Percentage.toFixed(2)} %</p>
+              return <p key={index}>{index}. {entry.municipalityName} {entry.age15to64Percentage.toFixed(2)} %</p>
             })}
           </div>
           : 
-          viewData == "least-18to64" ?
+          viewData == "least-15to64" ?
           <div>
-            <h3>Suhteellisesti vähiten 18-64-vuotiaita vuonna {endYear}</h3>
-            {orderBy18To64.slice(0, viewTop).map(entry => {
+            <h3>Suhteellisesti vähiten 15-64-vuotiaita vuonna {endYear}</h3>
+            {orderBy15To64.slice(0, viewTop).map(entry => {
               index += 1;
-              return <p>{index}. {entry.municipalityName} {entry.age18to64Percentage.toFixed(2)} %</p>
+              return <p key={index}>{index}. {entry.municipalityName} {entry.age15to64Percentage.toFixed(2)} %</p>
             })}
           </div>
           : 
-          viewData == "most-under18" ?
+          viewData == "most-under15" ?
           <div>
-            <h3>Suhteellisesti eniten alle 18-vuotiaita vuonna {endYear}</h3>
-            {orderBy0To17.toReversed().slice(0, viewTop).map(entry => {
+            <h3>Suhteellisesti eniten alle 15-vuotiaita vuonna {endYear}</h3>
+            {orderBy0To14.toReversed().slice(0, viewTop).map(entry => {
               index += 1;
-              return <p>{index}. {entry.municipalityName} {entry.under18Percentage.toFixed(2)} %</p>
+              return <p key={index}>{index}. {entry.municipalityName} {entry.under15Percentage.toFixed(2)} %</p>
             })}
           </div>
           : 
-          viewData == "least-under18" ?
+          viewData == "least-under15" ?
           <div>
-            <h3>Suhteellisesti vähiten alle 18-vuotiaita vuonna {endYear}</h3>
-            {orderBy0To17.slice(0, viewTop).map(entry => {
+            <h3>Suhteellisesti vähiten alle 15-vuotiaita vuonna {endYear}</h3>
+            {orderBy0To14.slice(0, viewTop).map(entry => {
               index += 1;
-              return <p>{index}. {entry.municipalityName} {entry.under18Percentage.toFixed(2)} %</p>
+              return <p key={index}>{index}. {entry.municipalityName} {entry.under15Percentage.toFixed(2)} %</p>
             })}
           </div>
           : <></>

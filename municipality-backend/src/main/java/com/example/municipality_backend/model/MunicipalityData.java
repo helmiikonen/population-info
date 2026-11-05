@@ -26,13 +26,13 @@ public class MunicipalityData {
 	        PopulationRecord record = this.populationByYear.get(key);
 	        int year = record.getYear();
 	        int total = record.getTotal();
-	        int age0_17 = record.getAge0_17();
-	        int age18_64 = record.getAge18_64();	       
+	        int age0_14 = record.getAge0_14();
+	        int age15_64 = record.getAge15_64();	       
 	        int age65plus = record.getAge65plus();
 	        System.out.println(year);
 	        System.out.println("  Total population: " + total);
-	        System.out.println("  0-17 year olds: " + age0_17);
-	        System.out.println("  18-64 year olds: " + age18_64);
+	        System.out.println("  0-14 year olds: " + age0_14);
+	        System.out.println("  15-64 year olds: " + age15_64);
 	        System.out.println("  65+ year olds: " + age65plus);
 	        
 	    }

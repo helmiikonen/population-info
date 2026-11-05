@@ -1,150 +1,244 @@
+
 import { LineChart, BarChart } from '@mui/x-charts';
 import { useState } from 'react';
-import { Box, Radio, RadioGroup, FormControlLabel, FormControl, FormLabel } from '@mui/material';
+import {
+  Box,
+  Radio,
+  RadioGroup,
+  FormControlLabel,
+  FormControl,
+  FormLabel
+} from '@mui/material';
 
-function PopulationChart({data, startYear, endYear}) {
-
-  const populationByYear = []
-
-  const percentageFormatter = (value) => `${(value*100).toFixed(1)}%`
-
-  const numberFormatter = (value) => new Intl.NumberFormat().format(value);
-
-  const plusFormatter = (value) => {
-    if (value > 0) {
-      return "+" + numberFormatter(value).toString();
-    } else {
-      return numberFormatter(value).toString();
-    }
-  }
+function PopulationChart({ data, startYear, endYear }) {
 
   const [ageGroupView, setAgeGroupView] = useState("numbers");
 
-  const [populationChange_0_17, setPopulationChange_0_17] = useState(0);
-  const [populationChange_18_64, setPopulationChange_18_64] = useState(0);
-  const [populationChange_65plus, setPopulationChange_65plus] = useState(0);
-  const [percentageChange_0_17, setPercentageChange_0_17] = useState(0);
-  const [percentageChange_18_64, setPercentageChange_18_64] = useState(0);
-  const [percentageChange_65plus, setPercentageChange_65plus] = useState(0);
-  const [relativeChange_0_17, setRelativeChange_0_17] = useState(0);
-  const [relativeChange_18_64, setRelativeChange_18_64] = useState(0);
-  const [relativeChange_65plus, setRelativeChange_65plus] = useState(0);
+  const numberFormatter = (value) => new Intl.NumberFormat('fi-FI').format(value);
 
-  Object.entries(data.populationByYear).map(entry => {
+  const percentageFormatter = (value) => `${(value * 100).toFixed(1)} %`;
 
-    if (entry[1].year >= startYear && entry[1].year <= endYear) {
-      populationByYear.push({
-        year: entry[1].year.toString(), 
-        total: entry[1].total,
-        age0_17: entry[1].age0_17,
-        age18_64: entry[1].age18_64,
-        age65plus: entry[1].age65plus,
-        age0_17_relative: entry[1].age0_17 / entry[1].total,
-        age18_64_relative: entry[1].age18_64 / entry[1].total,
-        age65plus_relative: entry[1].age65plus / entry[1].total,
-      })
+  const plusFormatter = (value) => {
+    const number = Number(value);
+    if (number > 0) {
+      return "+" + numberFormatter(number);
     }
-  }) 
+    return numberFormatter(number);
+  };
 
-  const start = populationByYear.find(obj => obj.year == startYear)
-  const end = populationByYear.find(obj => obj.year == endYear)
+  // Muodostetaan kuvaajien käyttämä aineisto.
+  const populationByYear = Object.entries(
+    data.populationByYear || {}
+  )
+    .map(([yearKey, record]) => {
+      const total = Number(record.total) || 0;
+      const age0_14 = Number(record.age0_14) || 0;
+      const age15_64 = Number(record.age15_64) || 0;
+      const age65plus = Number(record.age65plus) || 0;
 
-  if (populationChange_0_17 != end["age0_17"] - start["age0_17"]) {
-    setPopulationChange_0_17(end["age0_17"] - start["age0_17"]);
-    setPercentageChange_0_17((end["age0_17"] - start["age0_17"])/start["age0_17"]);
-    setRelativeChange_0_17((end["age0_17_relative"] - start["age0_17_relative"]));
-  }
+      return {
+        year: Number(record.year ?? yearKey),
+        total,
+        age0_14,
+        age15_64,
+        age65plus,
 
-  if (populationChange_18_64 != end["age18_64"] - start["age18_64"]) {
-    setPopulationChange_18_64(end["age18_64"] - start["age18_64"]);
-    setPercentageChange_18_64((end["age18_64"] - start["age18_64"])/start["age18_64"]);
-    setRelativeChange_18_64((end["age18_64_relative"] - start["age18_64_relative"]));
-  }
+        // Ikäryhmän osuus kokonaisväestöstä.
+        age0_14_relative: total > 0 ? age0_14 / total : 0,
+        age15_64_relative: total > 0 ? age15_64 / total : 0,
+        age65plus_relative: total > 0 ? age65plus / total : 0
+      };
+    })
+    .filter(record =>
+      record.year >= Number(startYear) &&
+      record.year <= Number(endYear)
+    )
+    .sort((a, b) => a.year - b.year);
 
-  if(populationChange_65plus != end["age65plus"] - start["age65plus"]) {
-    setPopulationChange_65plus(end["age65plus"] - start["age65plus"]);
-    setPercentageChange_65plus((end["age65plus"] - start["age65plus"])/start["age65plus"]);
-    setRelativeChange_65plus((end["age65plus_relative"] - start["age65plus_relative"]));
-  }
-  
+  // Etsitään tarkastelujakson alku- ja loppuvuoden tiedot.
+  const start = populationByYear.find(
+    record => record.year === Number(startYear)
+  );
+
+  const end = populationByYear.find(
+    record => record.year === Number(endYear)
+  );
+
+  // Lasketaan muutokset.
+  const calculateChange = (startValue, endValue) => {
+    if (startValue == null || endValue == null) {
+      return 0;
+    }
+
+    return endValue - startValue;
+  };
+
+  const calculatePercentageChange = (startValue, endValue) => {
+    if (!startValue) {
+      return 0;
+    }
+
+    return ((endValue - startValue) / startValue) * 100;
+  };
+
+  const calculateRelativeChange = (startValue, endValue) => {
+    if (!start || !end) {
+      return 0;
+    }
+
+    return (endValue - startValue) * 100;
+  };
+
+  const changes = start && end ? [
+    {
+      label: "0–14-vuotiaat",
+      population: calculateChange(start.age0_14, end.age0_14),
+      percentage: calculatePercentageChange(start.age0_14, end.age0_14),
+      relative: calculateRelativeChange(
+        start.age0_14_relative,
+        end.age0_14_relative
+      )
+    },
+    {
+      label: "15–64-vuotiaat",
+      population: calculateChange(start.age15_64, end.age15_64),
+      percentage: calculatePercentageChange(start.age15_64, end.age15_64),
+      relative: calculateRelativeChange(
+        start.age15_64_relative,
+        end.age15_64_relative
+      )
+    },
+    {
+      label: "65 vuotta täyttäneet",
+      population: calculateChange(start.age65plus, end.age65plus),
+      percentage: calculatePercentageChange(start.age65plus, end.age65plus),
+      relative: calculateRelativeChange(
+        start.age65plus_relative,
+        end.age65plus_relative
+      )
+    }
+  ] : [];
+
   const handleChange = (event) => {
     setAgeGroupView(event.target.value);
   };
 
-
   return (
-    <Box sx={{paddingBottom: 5}}>
+    <Box sx={{ paddingBottom: 5 }}>
+
       <h3>Kokonaisväestö</h3>
+
       <LineChart
-        dataset = {populationByYear}
+        dataset={populationByYear}
         grid={{ vertical: true, horizontal: true }}
-        xAxis={[{ 
-          dataKey: 'year', 
-          valueFormatter: (value) => value.toString(),
+        xAxis={[{
+          dataKey: 'year',
+          valueFormatter: value => value.toString(),
           tickMinStep: 1
         }]}
-        yAxis={[{ width: 100, valueFormatter: numberFormatter }]}
+        yAxis={[{
+          width: 100,
+          valueFormatter: numberFormatter
+        }]}
         series={[
           {
             dataKey: 'total',
-          },
+            label: 'Väestö'
+          }
         ]}
         height={300}
       />
+
       <h3>Väestö ikäryhmittäin</h3>
-       <FormControl>
-        <FormLabel id="select-agegroup-view">Näytä</FormLabel>
+
+      <FormControl>
+        <FormLabel id="select-agegroup-view">
+          Näytä
+        </FormLabel>
+
         <RadioGroup
-          defaultValue="numbers"
           value={ageGroupView}
           onChange={handleChange}
         >
-          <FormControlLabel value="numbers" control={<Radio />} label="Lukumäärä" />
-          <FormControlLabel value="percentages" control={<Radio />} label="Prosenttiosuudet" />  
+          <FormControlLabel
+            value="numbers"
+            control={<Radio />}
+            label="Lukumäärä"
+          />
+
+          <FormControlLabel
+            value="percentages"
+            control={<Radio />}
+            label="Prosenttiosuudet"
+          />
         </RadioGroup>
       </FormControl>
-      {ageGroupView == "numbers" ? 
+
       <BarChart
-          dataset={populationByYear}
-          grid={{ vertical: true, horizontal: true }}
-          xAxis={[{ dataKey: 'year' }]}
-          yAxis={[{ width: 100, valueFormatter: numberFormatter }]}
-          series={[
-            { dataKey: 'age0_17', label: '0-17' },
-            { dataKey: 'age18_64', label: '18-64' },
-            { dataKey: 'age65plus', label: '65+' },
-          ]}
-          height={300}
-        /> :
-         <BarChart
-          dataset={populationByYear}
-          grid={{ vertical: true, horizontal: true }}
-          xAxis={[{ dataKey: 'year' }]}
-          yAxis={[{ width: 100, valueFormatter: percentageFormatter }]}
-          series={[
-            { dataKey: 'age0_17_relative', label: '0-17', valueFormatter: percentageFormatter },
-            { dataKey: 'age18_64_relative', label: '18-64', valueFormatter: percentageFormatter },
-            { dataKey: 'age65plus_relative', label: '65+', valueFormatter: percentageFormatter },
-          ]}
-          height={300}
-        />
-      } <div>
-          <h4>Muutokset ikäryhmittäin</h4>
-          <p><strong>0-17 -vuotiaat:</strong></p>
-          <p>Lukumäärän muutos: {plusFormatter(populationChange_0_17)} ({plusFormatter((percentageChange_0_17*100).toFixed(1))} %)</p>
-          <p>Suhteellinen muutos: {plusFormatter((relativeChange_0_17*100).toFixed(1))} prosenttiyksikköä</p>
-          <p><strong>18-64-vuotiaat:</strong></p>
-          <p>Lukumäärän muutos: {plusFormatter(populationChange_18_64)} ({plusFormatter((percentageChange_18_64*100).toFixed(1))} %)</p>
-          <p>Suhteellinen muutos: {plusFormatter((relativeChange_18_64*100).toFixed(1))} prosenttiyksikköä</p>          
-          <p><strong>Yli 65-vuotiaat:</strong></p>
-          <p>Lukumäärän muutos: {plusFormatter(populationChange_65plus)} ({plusFormatter((percentageChange_65plus*100).toFixed(1))} %)</p>
-          <p>Suhteellinen muutos: {plusFormatter((relativeChange_65plus*100).toFixed(1))} prosenttiyksikköä</p>
-        </div>
-      
-      
-       
+        dataset={populationByYear}
+        grid={{ vertical: true, horizontal: true }}
+        xAxis={[{
+          dataKey: 'year',
+          valueFormatter: value => value.toString()
+        }]}
+        yAxis={[{
+          width: 100,
+          valueFormatter: ageGroupView === "numbers"
+            ? numberFormatter
+            : percentageFormatter
+        }]}
+        series={
+          ageGroupView === "numbers"
+            ? [
+                { dataKey: 'age0_14', label: '0–14' },
+                { dataKey: 'age15_64', label: '15–64' },
+                { dataKey: 'age65plus', label: '65+' }
+              ]
+            : [
+                {
+                  dataKey: 'age0_14_relative',
+                  label: '0–14',
+                  valueFormatter: percentageFormatter
+                },
+                {
+                  dataKey: 'age15_64_relative',
+                  label: '15–64',
+                  valueFormatter: percentageFormatter
+                },
+                {
+                  dataKey: 'age65plus_relative',
+                  label: '65+',
+                  valueFormatter: percentageFormatter
+                }
+              ]
+        }
+        height={300}
+      />
+
+      <h4>Muutokset ikäryhmittäin</h4>
+
+      {!start || !end ? (
+        <p>Valitulta aikaväliltä puuttuu väestötietoja.</p>
+      ) : (
+        changes.map(change => (
+          <Box key={change.label} sx={{ paddingBottom: 1 }}>
+            <p><strong>{change.label}:</strong></p>
+
+            <p>
+              Lukumäärän muutos: {plusFormatter(change.population)}
+              {" "}({plusFormatter(change.percentage.toFixed(1))} %)
+            </p>
+
+            <p>
+              Suhteellinen muutos:{" "}
+              {plusFormatter(change.relative.toFixed(1))}
+              {" "}prosenttiyksikköä
+            </p>
+          </Box>
+        ))
+      )}
+
     </Box>
-    
   );
 }
 

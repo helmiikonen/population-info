@@ -11,7 +11,7 @@ function MunicipalityDropdown({ selectedMunicipality, setSelectedMunicipality })
     fetch("http://localhost:8080/api/municipalities-list")
     .then(res => res.json())
     .then(data => setMunicipalities(data))
-    .catch(err => console.error(err));
+    .catch();
   }, []);
 
   return (
